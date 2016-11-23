@@ -18,7 +18,8 @@ def test_write_to_xls():
 
 def parse_head(data):
     '''
-    # type: (DateFrame) -> (title, (r_comp, r_unit), (c_comp, c_unit), row, col)
+    # type: (DateFrame) ->
+    #   (title, (r_comp, r_unit), (c_comp, c_unit), row, col)
     '''
     ndata = np.array(data)
     title = ndata[0, 0]
@@ -54,23 +55,34 @@ def parse_data(data, remove_head=True):
         tables[datestring] = table
     return tables
 
-#
+
 # * Table Normalization
+
 
 def normalize_table(table):
     '''
     # type: (np.array) -> (np.array)
+    Maps 8x11/12 matrix to 8x10 matrix
+
+    Concept: we throw out the 12th column if present
+      we then find the mean along the 11th column
+      we then divide everything by this mean
     '''
+    norm = table[:, 10].mean()
+    data = table[:, :10] / norm
+    return data
 
 
 def test():
     filename = 'test/combenefit_test.xlsx'
     data = pandas.read_excel(filename, header=None)
-    (title, (r_comp, r_unit), (c_comp, c_unit), row, col) = parse_head(data)
+    parsed = parse_head(data)
+    (title, (r_comp, r_unit), (c_comp, c_unit), r_axis, c_axis) = parsed
     tables = parse_data(data)
     normalize = True
     for table in tables:
-        pass
+        table = normalize_table(table)
+
 
     # debug
     return locals()
