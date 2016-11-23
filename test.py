@@ -5,16 +5,15 @@ from datetime import datetime
 import pandas
 import sys
 import numpy as np
+from collections import OrderedDict
 
 
 def test_write_to_xls():
-    data_frame = pandas.read_excel("combenefit_test.xlsx")
+    data_frame = pandas.read_excel("test/combenefit_test.xlsx")
 
     print(dir(data_frame))
 
-    # writer = pandas.ExcelWriter()
-    data_frame.to_excel('test.xls', "Sheet1")
-    # writer.save()
+    data_frame.to_excel('test/test.xls', "Sheet1")
 
 
 def parse_head(data):
@@ -37,15 +36,44 @@ def parse_head(data):
 
 def parse_data(data, remove_head=True):
     '''
-    # type: (DateFrame) -> List[np.array]
+    # type: (DateFrame) -> OrderedDict[datestring, np.array]
     '''
-    pass
+    ndata = np.array(data)
+    start = 5 if remove_head else 0
+    cnt, rem = divmod(ndata.shape[0] - start, 10)
+    if rem != 9:
+        raise ValueError("Should have (table_count - 1) x 10 + 9 rows after "
+                         "header, have this instead: {0}"
+                         .format(ndata.shape[0] - start))
+    table_count = cnt + 1
+    tables = OrderedDict()
+    for ii in range(table_count):
+        table_start = start + ii * 10
+        datestring = ndata[table_start, 0]
+        table = ndata[table_start + 1:table_start + 1 + 8]
+        tables[datestring] = table
+    return tables
+
+#
+# * Table Normalization
+
+def normalize_table(table):
+    '''
+    # type: (np.array) -> (np.array)
+    '''
 
 
 def test():
-    filename = 'combenefit_test.xlsx'
+    filename = 'test/combenefit_test.xlsx'
     data = pandas.read_excel(filename, header=None)
-    dummy = data
+    (title, (r_comp, r_unit), (c_comp, c_unit), row, col) = parse_head(data)
+    tables = parse_data(data)
+    normalize = True
+    for table in tables:
+        pass
+
+    # debug
+    return locals()
 
 
 def main(args):
@@ -53,7 +81,7 @@ def main(args):
     print("--- this is a test at {0} ---".format(datetime.now()))
     print('----------------------------------------------------')
 
-    test_write_to_xls()
+    test()
 
 
 if __name__ == '__main__':
