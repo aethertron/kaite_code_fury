@@ -16,23 +16,32 @@ def test_write_to_xls():
     data_frame.to_excel('test/test.xls', "Sheet1")
 
 
+class compound_axis(object):
+
+    def __init__(self, name, units, abscissa):
+        self.name = name
+        self.units = units
+        self.abscissa = abscissa
+
+    def __str__(self):
+        string = '{clsname}'
+        string += '{{name: {name}, units: {units}, abscissa: {abscissa}}}'
+        return string.format(clsname=self.__class__.__name__,
+                             name=self.name,
+                             units=self.units,
+                             abscissa=self.abscissa)
+
+
 def parse_head(data):
     '''
-    # type: (DateFrame) ->
-    #   (title, (r_comp, r_unit), (c_comp, c_unit), row, col)
+    # type: (data) -> (title, row_axis, col_axis)
+    # type: (DateFrame) -> (str, compound_axis, compound_axis)
     '''
     ndata = np.array(data)
     title = ndata[0, 0]
-    #
-    r_comp = ndata[2, 0]
-    r_unit = ndata[2, 1]
-    row = ndata[2, 2:]
-    #
-    c_comp = ndata[3, 0]
-    c_unit = ndata[3, 1]
-    col = ndata[3, 2:]
-    #
-    return (title, (r_comp, r_unit), (c_comp, c_unit), row, col)
+    row_axis = compound_axis(ndata[2, 0],  ndata[2, 1], ndata[2, 2:])
+    col_axis = compound_axis(ndata[3, 0],  ndata[3, 1], ndata[3, 2:])
+    return (title, row_axis, col_axis)
 
 
 def parse_data(data, remove_head=True):
@@ -72,16 +81,40 @@ def normalize_table(table):
     data = table[:, :10] / norm
     return data
 
+# * Final Frame
+
+
+def form_data_frame(table, datestr, row_axis, col_axis):
+    '''
+    # type: (np.array, str, compound_axis, compound_axis) -> DataFrame
+    '''
+    index = pandas.Index(row_axis.abscissa,
+                         name=row_axis.name)
+    index.tags = {'units': row_axis.units}
+    columns = pandas.Index(col_axis.abscissa,
+                           name=col_axis.name)
+    columns.tags = {'units': col_axis.units}
+    frame = pandas.DataFrame(table, index=index, columns=columns)
+    frame.name = datestr
+    frame.tags = {'datestr': datestr}
+    return frame
+
 
 def test():
     filename = 'test/combenefit_test.xlsx'
     data = pandas.read_excel(filename, header=None)
-    parsed = parse_head(data)
-    (title, (r_comp, r_unit), (c_comp, c_unit), r_axis, c_axis) = parsed
+    (title, row_axis, col_axis) = parse_head(data)
     tables = parse_data(data)
     normalize = True
-    for table in tables:
-        table = normalize_table(table)
+    for datestr in tables:
+        table = tables[datestr]
+        if normalize:
+            table = normalize_table(table)
+        frame = form_data_frame(table, datestr, row_axis, col_axis)
+        # Throw out first indicies
+        frame = frame.iloc[1:, 1:]
+        # Sort by indicies
+        frame = frame.sort_index(0).sort_index(0)
 
 
     # debug
