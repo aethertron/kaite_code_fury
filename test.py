@@ -2,14 +2,14 @@
 from __future__ import print_function
 #
 from datetime import datetime
-import pandas
+import pandas as pd
 import sys
 import numpy as np
 from collections import OrderedDict
 
 
 def test_write_to_xls():
-    data_frame = pandas.read_excel("test/combenefit_test.xlsx")
+    data_frame = pd.read_excel("test/combenefit_test.xlsx")
 
     print(dir(data_frame))
 
@@ -39,8 +39,10 @@ def parse_head(data):
     '''
     ndata = np.array(data)
     title = ndata[0, 0]
-    row_axis = compound_axis(ndata[2, 0],  ndata[2, 1], ndata[2, 2:])
-    col_axis = compound_axis(ndata[3, 0],  ndata[3, 1], ndata[3, 2:])
+    row_abs = ndata[2, 2:][pd.notnull(ndata[2, 2:])]
+    col_abs = ndata[3, 2:][pd.notnull(ndata[3, 2:])]
+    row_axis = compound_axis(ndata[2, 0],  ndata[2, 1], row_abs)
+    col_axis = compound_axis(ndata[3, 0],  ndata[3, 1], col_abs)
     return (title, row_axis, col_axis)
 
 
@@ -88,21 +90,28 @@ def form_data_frame(table, datestr, row_axis, col_axis):
     '''
     # type: (np.array, str, compound_axis, compound_axis) -> DataFrame
     '''
-    index = pandas.Index(row_axis.abscissa,
+    index = pd.Index(row_axis.abscissa,
                          name=row_axis.name)
     index.tags = {'units': row_axis.units}
-    columns = pandas.Index(col_axis.abscissa,
+    columns = pd.Index(col_axis.abscissa,
                            name=col_axis.name)
     columns.tags = {'units': col_axis.units}
-    frame = pandas.DataFrame(table, index=index, columns=columns)
+    frame = pd.DataFrame(table, index=index, columns=columns)
     frame.name = datestr
     frame.tags = {'datestr': datestr}
     return frame
 
 
+def write_data_frame(filename, frame, row_axis, col_axis):
+    '''
+    #type: (str, pd.DataFrame, compound_axis, compound_axis) -> None
+    writes xls file
+    '''
+    frame.to_excel(filename)
+
 def test():
     filename = 'test/combenefit_test.xlsx'
-    data = pandas.read_excel(filename, header=None)
+    data = pd.read_excel(filename, header=None)
     (title, row_axis, col_axis) = parse_head(data)
     tables = parse_data(data)
     normalize = True
@@ -110,12 +119,27 @@ def test():
         table = tables[datestr]
         if normalize:
             table = normalize_table(table)
-        frame = form_data_frame(table, datestr, row_axis, col_axis)
-        # Throw out first indicies
-        frame = frame.iloc[1:, 1:]
-        # Sort by indicies
+        # extract 8x8
+        frame = form_data_frame(table[:8, :8], datestr, row_axis, col_axis)
+        # last cols are to be added: they are col concentration 0 and row concentration 0
+        marg_row_vec = pd.DataFrame(table[:, 8:9], frame.index, [0])  # col concentration 0
+        marg_col_vec = pd.DataFrame(table[:, 9:10].T, [0], frame.columns) # row concentration 0
+        # add marginals
+        frame = pd.concat([frame, marg_row_vec], 1)
+        frame = pd.concat([frame, marg_col_vec], 0)
         frame = frame.sort_index(0).sort_index(0)
+        # hacky: for whatever reason, need to add back names (keep units elsewhere)
+        frame.index.name = row_axis.name
+        frame.columns.name = col_axis.name
+        frame.iloc[0, 0] = 0.0
+        # Sorted, throw out last/highest indicies
+        rows, cols = frame.shape
+        frame = frame.iloc[:rows - 1, :cols - 1]
+        # Frame has been normalized, filtered and is ready for writing!
+        write_data_frame('foo.xls', frame, row_axis, col_axis)
+        # Sort by indicies
 
+        break
 
     # debug
     return locals()
