@@ -184,7 +184,7 @@ def process_data_file(filename, destdir):
         # hacky: for whatever reason, need to add back names (keep units elsewhere)
         frame.index.name = row_axis.name
         frame.columns.name = col_axis.name
-        frame.iloc[0, 0] = 0.0
+        frame.iloc[0, 0] = 100.0
         # Sorted, throw out last/highest indicies
         rows, cols = frame.shape
         frame = frame.iloc[:rows - 1, :cols - 1]
